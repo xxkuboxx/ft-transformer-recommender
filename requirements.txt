@@ -1,0 +1,15 @@
+# PyTorch, torchvision, torchaudioはDockerfileで特定のCUDAバージョンと共にインストールするため、ここには含めない
+
+# Core ML Libraries
+sentence-transformers>=2.2.2
+rtdl>=0.0.9
+
+# Vector Search
+faiss-gpu>=1.7.0
+
+# Data Handling & Utilities
+pandas>=1.4.0
+scikit-learn>=1.0.0
+numpy>=1.21.0
+tqdm
+openpyxl
