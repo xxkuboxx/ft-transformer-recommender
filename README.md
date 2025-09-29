@@ -1,94 +1,138 @@
-# FT-Transformer Recommender - 開発環境構築ガイド
+# FT-Transformer Recommender
 
-このリポジトリは、Instacartデータセットを用いたFT-Transformerによる推薦モデルの実験環境をDockerで構築するためのものです。
+このリポジトリは、ブログ記事の実験を再現するためのものです。
 
-最終的なゴールは、ローカルPCでの開発とGCP（Google Cloud Platform）上での実行の両方で、完全に同一の環境を再現することです。このため、ベースイメージにはGCPの公式Deep Learning Containerを採用しています。
+Instacartの公開データセットを使い、FT-Transformerを用いた推薦モデルの構築から評価までを、Dockerコンテナ上のJupyterLabで一気通貫に実行できます。
 
-## 概要
+-----
 
-この環境構築の核心は、**GCP専用に設計されたDockerイメージを、GCPのサービスが存在しないローカルPC上で安定して動作させる**点にあります。
-標準的な手順では、GCP固有の拡張機能やライブラリの依存関係が原因で、JupyterLabが正常に起動しません。
+## プロジェクトの構成
 
-## 1. 前提条件
+環境構築を始める前に、リポジトリをクローンし、以下のようなディレクトリ構成になっていることを確認してください。`Instacart_dataset`ディレクトリ配下には https://www.kaggle.com/datasets/psparks/instacart-market-basket-analysis からダウンロードしてきたファイルを手動で配置します。
 
-この環境を構築する前に、お使いのPC（ホストマシン）が以下の条件を満たしていることを確認してください。
+```
+/FT-Transformer-Recommender (リポジトリのルート)
+├── Instacart_dataset/
+│   ├── aisles.csv
+│   ├── departments.csv
+│   ├── orders.csv
+│   ├── order_products__prior.csv
+│   └── products.csv
+├── tmp_data/ (ノートブック実行時に自動生成されます)
+├── 01_feature_engineering.ipynb
+├── 02_preprocess.ipynb
+├── 03_model_training.ipynb
+├── 04_evaluation_and_inference.ipynb
+├── Dockerfile
+├── requirements.txt
+└── README.md
+```
 
-- **Docker Desktop**がインストールされていること。
-- **WSL2 (Windows Subsystem for Linux)** が有効になっていること (Windowsユーザーの場合)。
-- **NVIDIA GPU**が搭載されていること。
-- **WSL2対応の最新NVIDIAドライバ**がインストールされていること。
-    - 古いドライバでは動作しません。
-    - [NVIDIAドライバ公式ダウンロードページ](https://www.nvidia.co.jp/Download/index.aspx?lang=jp) から、お使いのGPUに合った最新の「Game Ready」または「Studio」ドライバをインストールしてください。
-- **NVIDIA Container Toolkit**がDockerと連携しており、`--gpus all`オプションが利用可能なこと。
+-----
 
-**【動作確認】**
-PowerShellやターミナルで `wsl` と入力してWSL環境に入り、`nvidia-smi` コマンドが正常に実行できることを確認してください。これが失敗する場合、ドライバのインストールに問題があります。
+## 環境構築と実験の手順
 
-## 2. 環境構築と利用手順
+### Step 1: 前提条件のチェックリスト
 
-### ステップ 1: イメージのビルド
+PCが以下の条件を満たしているか確認してください。
 
-このリポジトリ（`Dockerfile`と`requirements.txt`がある場所）のルートで、以下のコマンドを実行してDockerイメージをビルドします。
+  - **Docker Desktop**のインストール
+  - **NVIDIA GPU**の搭載
+  - **最新のNVIDIAドライバ**のインストール
+      - 古いドライバではGPUを認識できません。
+      - [NVIDIAドライバ公式ページ](https://www.nvidia.co.jp/Download/index.aspx?lang=jp)から最新版をインストールしてください。
+  - **(Windowsユーザーのみ) WSL2**の有効化と、**NVIDIAドライバのWSL2対応**
+      - Docker Desktopの設定でWSL2バックエンドを使用していることを確認してください。
+
+**動作確認**
+PowerShellやターミナルで `wsl` と入力してWSL環境に入り、`nvidia-smi` コマンドを実行してください。GPUの情報が表示されれば準備OKです。失敗する場合は、ドライバの再インストールやPCの再起動を試してください。
+
+### Step 2: データセットのダウンロードと配置
+
+この実験には**Instacart Market Basket Analysis**データセットが必要です。
+
+1.  [Kaggleのデータセットページ](https://www.kaggle.com/datasets/psparks/instacart-market-basket-analysis)にアクセスします。（Kaggleアカウントが必要です）
+2.  `Download`ボタンをクリックし、`archive.zip`ファイルをダウンロードします。
+3.  ダウンロードしたzipファイルを解凍します。
+4.  解凍して出てきた **全てのCSVファイル** (`orders.csv`, `products.csv`など) を、`Instacart_dataset` ディレクトリの中に移動させます。
+
+### Step 3: Dockerイメージのビルド
+
+リポジトリのルートディレクトリ（`Dockerfile`がある場所）でターミナルを開き、以下のコマンドを実行してDockerイメージをビルドします。
 
 ```powershell
 docker build -t ftt-recommender:latest .
 ```
-この処理には数分かかります。Dockerfileや`requirements.txt`を更新した場合は、このコマンドを再実行してイメージを更新してください。
 
-### ステップ 2: コンテナの起動
+この処理には数分かかります。ベースイメージのダウンロードとライブラリのインストールが行われます。
+
+### Step 4: JupyterLabコンテナの起動と実験実行
 
 イメージのビルドが完了したら、以下のコマンドでJupyterLabコンテナを起動します。
 
 **Windows (PowerShell) の場合:**
+
 ```powershell
+# -d: バックグラウンドで実行
+# --gpus all: コンテナからGPUを利用
+# --name ftt-lab: コンテナに名前をつける
+# -p 8888:8080: ホストPCの8888番ポートをコンテナの8080番ポートに接続
+# -v "$(Get-Location):/home/jupyter/work": 現在のフォルダをコンテナ内にマウント
 docker run -d --gpus all --name ftt-lab -p 8888:8080 -v "$(Get-Location):/home/jupyter/work" ftt-recommender:latest
 ```
 
 **Linux / macOS の場合:**
+
 ```bash
 docker run -d --gpus all --name ftt-lab -p 8888:8080 -v "$(pwd):/home/jupyter/work" ftt-recommender:latest
 ```
-これにより、現在のディレクトリがコンテナ内の`/home/jupyter/work`にマウントされ、ファイルの同期が取られます。
 
-### ステップ 3: JupyterLabへのアクセス
+コンテナが起動したら、Webブラウザで **`http://localhost:8888`** にアクセスしてください。
+JupyterLabの画面が表示されたら、以下の順番でノートブックを実行していくだけで、ブログ記事の実験が全て再現されます。
 
-Webブラウザを開き、以下のアドレスにアクセスします。
+1.  `01_feature_engineering.ipynb`
+2.  `02_preprocess.ipynb`
+3.  `03_model_training.ipynb`
+4.  `04_evaluation_and_inference.ipynb`
 
-**`http://localhost:8888`**
+-----
 
-トークン認証は無効化されているため、直接JupyterLabのインターフェースが表示されます。
+## コンテナの日常的な操作
 
-### ステップ 4: コンテナの停止と再開
+一度コンテナを作成した後は、`run`コマンドを再実行する必要はありません。
 
-- **停止:** `docker stop ftt-lab`
-- **再開:** `docker start ftt-lab`
+  - **コンテナを一時停止する:** `docker stop ftt-lab`
+  - **停止したコンテナを再開する:** `docker start ftt-lab`
 
-一度 `docker run` でコンテナを作成した後は、この停止・再開コマンドで運用してください。
+作業を中断・再開する際は、これらのコマンドを使用してください。
 
-## 3. なぜこのDockerfileは複雑なのか？ (設計思想)
+-----
 
-このDockerfileは、いくつかの重要な問題を解決するために、意図的に特定の手順を踏んでいます。
+<br>
 
-### 3.1. PyTorchの依存関係問題
+<details><summary><strong>【参考】Dockerfileの中身について</strong></summary>
 
-`pip`の依存関係リゾルバは、`sentence-transformers`などをインストールする際に、PyPIで公開されている標準のCPU版`torch`をインストールしようとします。これを防がないと、**CUDA対応版の`torch`が上書き**されてしまい、GPUが使えなくなります。
+このDockerfileは、「GCP公式のDeep Learning Containerイメージを、GCP環境外のローカルPCで動作させる」という課題を解決するために、いくつかの工夫をしています。これにより、GCP上でより高性能なGPUで高速に訓練したい時に、全く同じイメージを使うことでバージョン等の依存関係の問題に躓くことなく、実験を再現できるメリットがあります。
 
-**解決策:**
-証明済みの**「`--no-deps`を使った三段階インストール戦略」**をDockerfile内で実行しています。
-1.  まず、`requirements.txt`内のライブラリ本体を、依存関係を完全に無視してインストールします (`--no-deps`)。
-2.  次に、`sentence-transformers`などが必要とする依存ライブラリを、`torch`を除いて手動でインストールします。
-3.  これにより、`pip`の自動解決による`torch`の上書きを確実に防ぎ、CUDA環境を保護しています。
+#### 1. PyTorchの依存関係問題
 
-### 3.2. GCP固有のJupyterLab拡張機能の問題
-
-GCPのベースイメージには、`beatrix_jupyterlab`や`dataproc_jupyter_plugin`といった、GCP環境との連携を前提とした拡張機能がプリインストールされています。これらがローカル環境で起動しようとすると、存在しないGCPサービスに接続しようとしてクラッシュし、JupyterLab全体の起動失敗を招きます。
+`pip`で`sentence-transformers`などをインストールすると、依存関係解決の過程で、CUDA対応の`torch`がCPU版に**上書きされてしまう**問題があります。
 
 **解決策:**
-`RUN jupyter labextension disable <拡張機能名>` コマンドを使い、これらの**問題となる拡張機能を明示的に無効化**しています。これにより、JupyterLabはクリーンな状態で起動できます。
+`--no-deps`フラグを活用し、①ライブラリ本体を依存関係無視でインストール → ②`torch`を除いた依存ライブラリを手動でインストール、という方法を採用。これにより、CUDA環境を確実に保護しています。
 
-### 3.3. 起動コマンドの上書き
+#### 2. GCP固有のJupyterLab拡張機能の問題
 
-ベースイメージのデフォルト起動コマンドは、GCPのメタデータサーバーへの接続など、ローカル環境ではエラーとなる処理を含んでいます。
+ベースイメージに含まれる`beatrix_jupyterlab`などのGCP連携用拡張機能は、ローカル環境では存在しないGCPサービスに接続しようとしてエラーとなり、JupyterLab全体の起動を妨げます。
 
 **解決策:**
-`CMD`命令を使い、コンテナのデフォルト起動コマンドを、**認証トークンを無効にし、ローカルでの動作に最適化された安全な`jupyter lab`コマンドに上書き**しています。
+`RUN jupyter labextension disable <拡張機能名>`コマンドで、問題となる拡張機能を明示的に無効化し、クリーンな起動を実現しています。
+
+#### 3. 起動コマンドの上書き
+
+ベースイメージのデフォルト起動コマンドは、GCPのメタデータサーバーへの接続試行など、ローカル環境では不要かつエラーの原因となる処理を含んでいます。
+
+**解決策:**
+`CMD`命令でコンテナの起動コマンドを、認証トークンを無効にし、ローカルでの動作に最適化された安全な`jupyter lab`コマンドに上書きしています。
+
+</details>
