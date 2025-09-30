@@ -1,6 +1,6 @@
 # FT-Transformer Recommender
 
-このリポジトリは、ブログ記事の実験を再現するためのものです。
+このリポジトリは、ブログ記事["テーブルデータをベクトル化！FT-Transformerによる推薦システム構築"](https://zenn.dev/xxkuboxx/articles/86b91e4426d4fa)の実験を再現するためのものです。
 
 Instacartの公開データセットを使い、FT-Transformerを用いた推薦モデルの構築から評価までを、Dockerコンテナ上のJupyterLabで一気通貫に実行できます。
 
@@ -136,3 +136,4 @@ JupyterLabの画面が表示されたら、以下の順番でノートブック�
 `CMD`命令でコンテナの起動コマンドを、認証トークンを無効にし、ローカルでの動作に最適化された安全な`jupyter lab`コマンドに上書きしています。
 
 </details>
+
